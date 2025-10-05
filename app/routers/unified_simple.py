@@ -39,9 +39,10 @@ async def analyze_without_apis(
     🚀 ANÁLISIS COMPLETO SIN APIs PAGADAS
     
     Input puede ser:
-    - Dominio: "nike.com" 
-    - URL Facebook: "https://facebook.com/nike"
-    - JSON: {"domain": "nike.com", "facebook_url": "https://facebook.com/nike"}
+    - Solo dominio: "nike.com" (busca Facebook automáticamente)
+    - Solo Facebook: "https://facebook.com/nike" (extrae dominio automáticamente)
+    - Ambos: {"domain": "nike.com", "facebook": "https://facebook.com/nike"}
+    - También: {"domain": "nike.com", "facebook_url": "https://facebook.com/nike"}
     
     SIEMPRE incluye:
     ✅ Tracking analysis (pixels, scripts)
@@ -57,7 +58,7 @@ async def analyze_without_apis(
     🎯 Precisión: 85-95% | 💰 Costo: GRATIS
     """
     try:
-        # Parsear input
+        # Parsear input flexible
         domain = None
         facebook_url = None
         
@@ -71,7 +72,7 @@ async def analyze_without_apis(
                 domain = input_data
         elif isinstance(input_data, dict):
             domain = input_data.get('domain')
-            facebook_url = input_data.get('facebook_url')
+            facebook_url = input_data.get('facebook_url') or input_data.get('facebook')
         else:
             raise HTTPException(status_code=400, detail="Input debe ser string (dominio) o JSON")
         
@@ -196,9 +197,10 @@ async def analyze_with_apis(
     💰 ANÁLISIS COMPLETO CON APIs PAGADAS
     
     Input puede ser:
-    - Dominio: "nike.com"
-    - URL Facebook: "https://facebook.com/nike" 
-    - JSON: {"domain": "nike.com", "facebook_url": "https://facebook.com/nike"}
+    - Solo dominio: "nike.com" (busca Facebook automáticamente)
+    - Solo Facebook: "https://facebook.com/nike" (extrae dominio automáticamente) 
+    - Ambos: {"domain": "nike.com", "facebook": "https://facebook.com/nike"}
+    - También: {"domain": "nike.com", "facebook_url": "https://facebook.com/nike"}
     
     INCLUYE AUTOMÁTICAMENTE:
     ✅ Google Ads API (datos oficiales exactos)
@@ -216,7 +218,7 @@ async def analyze_with_apis(
                 detail="APIs oficiales no configuradas. Configure Google Ads API y Meta Marketing API."
             )
         
-        # Parsear input (mismo que sin APIs)
+        # Parsear input flexible (misma lógica que endpoint sin APIs)
         domain = None
         facebook_url = None
         
@@ -229,7 +231,7 @@ async def analyze_with_apis(
                 domain = input_data
         elif isinstance(input_data, dict):
             domain = input_data.get('domain')
-            facebook_url = input_data.get('facebook_url')
+            facebook_url = input_data.get('facebook_url') or input_data.get('facebook')
         
         if not domain:
             raise HTTPException(status_code=400, detail="Dominio requerido")
