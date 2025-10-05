@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
 
-from .routers import ads_router, no_api_router
+from .routers import ads_router, no_api_router, ultra_router
 from .models import ErrorResponse
 from .config import settings
 
@@ -32,6 +32,7 @@ app.add_middleware(
 # Incluir routers
 app.include_router(ads_router)
 app.include_router(no_api_router)
+app.include_router(ultra_router)
 
 
 @app.get("/")
