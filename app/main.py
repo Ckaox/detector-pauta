@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 import os
 
 from .routers import ads_router, no_api_router, ultra_router
+from .routers.unified_without_apis import router as without_apis_router
+from .routers.unified_with_apis import router as with_apis_router
 from .models import ErrorResponse
 from .config import settings
 
@@ -30,6 +32,10 @@ app.add_middleware(
 )
 
 # Incluir routers
+app.include_router(without_apis_router)  # 🚀 NUEVO: Endpoint principal sin APIs
+app.include_router(with_apis_router)     # 🚀 NUEVO: Endpoint principal con APIs
+
+# Routers legacy (mantener por compatibilidad)
 app.include_router(ads_router)
 app.include_router(no_api_router)
 app.include_router(ultra_router)
@@ -37,12 +43,38 @@ app.include_router(ultra_router)
 
 @app.get("/")
 async def root():
-    """Endpoint raíz con información básica de la API"""
+    """Endpoint raíz con información de la API unificada"""
     return {
-        "message": "Ads Checker API",
-        "version": "1.0.0",
+        "message": "🚀 Ads Checker API - Sistema Unificado de Detección",
+        "version": "3.0.0",
         "docs": "/docs",
-        "health": "/api/v1/ads/health"
+        "endpoints_principales": {
+            "sin_apis": {
+                "url": "/api/v1/without-apis/",
+                "descripcion": "Detección sin APIs pagadas (85-95% precisión)",
+                "metodos": ["ultra", "basic", "facebook-only"],
+                "costo": "Gratuito",
+                "uso_recomendado": "Pre-filtrado de bases de datos grandes"
+            },
+            "con_apis": {
+                "url": "/api/v1/with-apis/",
+                "descripcion": "Detección con APIs oficiales (99% precisión)",
+                "apis": ["Google Ads API", "Meta Marketing API"],
+                "costo": "Pagado por llamada",
+                "uso_recomendado": "Dominios ya pre-filtrados"
+            }
+        },
+        "flujo_recomendado": [
+            "1. Filtrar dominios con /without-apis (ahorro 80-90%)",
+            "2. Analizar prioritarios con /with-apis (datos exactos)",
+            "3. Tomar decisiones basadas en datos precisos"
+        ],
+        "nuevas_funcionalidades": [
+            "📘 Transparencia avanzada de Facebook",
+            "🔬 Scraping de 'anuncios en circulación'",
+            "📊 Endpoints unificados y simplificados",
+            "💰 Calculadora de costos integrada"
+        ]
     }
 
 
