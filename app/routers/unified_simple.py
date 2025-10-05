@@ -73,21 +73,36 @@ async def analyze_without_apis(
         elif isinstance(input_data, dict):
             domain = input_data.get('domain')
             facebook_url = input_data.get('facebook_url') or input_data.get('facebook')
+            
+            # Limpiar strings vacíos
+            if domain == "":
+                domain = None
+            if facebook_url == "":
+                facebook_url = None
         else:
             raise HTTPException(status_code=400, detail="Input debe ser string (dominio) o JSON")
         
-        if not domain:
-            raise HTTPException(status_code=400, detail="Dominio requerido")
+        # Validar que tenemos al menos uno
+        if not domain and not facebook_url:
+            raise HTTPException(status_code=400, detail="Se requiere al menos un dominio o URL de Facebook válidos")
+        
+        # Si solo tenemos Facebook URL, intentar extraer dominio
+        if not domain and facebook_url:
+            page_name = extract_domain_from_facebook_url(facebook_url)
+            domain = f"{page_name}.com" if page_name else None
         
         # Ejecutar análisis ultra-avanzado
-        ultra_result = await ultra_detector.analyze_domain_ultra(domain)
+        ultra_result = None
+        if domain:
+            ultra_result = await ultra_detector.analyze_domain_ultra(domain)
         
         # SIEMPRE ejecutar transparencia de Facebook
+        fb_result = None
         if facebook_url:
             # Si tenemos URL específica, usarla directamente
             fb_result = await fb_transparency._check_page_transparency(facebook_url, domain)
-        else:
-            # Búsqueda automática
+        elif domain:
+            # Búsqueda automática solo si tenemos dominio
             fb_result = await fb_transparency.search_page_transparency(domain)
         
         # Estructura JSON unificada y simplificada
@@ -232,9 +247,25 @@ async def analyze_with_apis(
         elif isinstance(input_data, dict):
             domain = input_data.get('domain')
             facebook_url = input_data.get('facebook_url') or input_data.get('facebook')
+            
+            # Limpiar strings vacíos
+            if domain == "":
+                domain = None
+            if facebook_url == "":
+                facebook_url = None
         
+        # Validar que tenemos al menos uno
+        if not domain and not facebook_url:
+            raise HTTPException(status_code=400, detail="Se requiere al menos un dominio o URL de Facebook válidos")
+        
+        # Si solo tenemos Facebook URL, intentar extraer dominio
+        if not domain and facebook_url:
+            page_name = extract_domain_from_facebook_url(facebook_url)
+            domain = f"{page_name}.com" if page_name else None
+        
+        # Para APIs oficiales, necesitamos dominio
         if not domain:
-            raise HTTPException(status_code=400, detail="Dominio requerido")
+            raise HTTPException(status_code=400, detail="Para APIs oficiales se requiere dominio. Puedes usar el endpoint /without-apis con solo Facebook URL")
         
         # Ejecutar análisis con APIs oficiales
         api_result = await ads_aggregator.analyze_domain_comprehensive(
