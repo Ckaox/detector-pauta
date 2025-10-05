@@ -4,9 +4,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
 
-from .routers import ads_router, no_api_router, ultra_router
-from .routers.unified_without_apis import router as without_apis_router
-from .routers.unified_with_apis import router as with_apis_router
+from .routers.unified_simple import router as unified_router
 from .models import ErrorResponse
 from .config import settings
 
@@ -31,49 +29,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir routers
-app.include_router(without_apis_router)  # 🚀 NUEVO: Endpoint principal sin APIs
-app.include_router(with_apis_router)     # 🚀 NUEVO: Endpoint principal con APIs
-
-# Routers legacy (mantener por compatibilidad)
-app.include_router(ads_router)
-app.include_router(no_api_router)
-app.include_router(ultra_router)
+# Incluir router unificado simple
+app.include_router(unified_router)
 
 
 @app.get("/")
 async def root():
-    """Endpoint raíz con información de la API unificada"""
+    """API ultra-simplificada con solo 2 endpoints"""
     return {
-        "message": "🚀 Ads Checker API - Sistema Unificado de Detección",
-        "version": "3.0.0",
+        "message": "🚀 Ads Checker API - Ultra Simplificada",
+        "version": "4.0.0",
         "docs": "/docs",
-        "endpoints_principales": {
+        "endpoints": {
             "sin_apis": {
-                "url": "/api/v1/without-apis/",
-                "descripcion": "Detección sin APIs pagadas (85-95% precisión)",
-                "metodos": ["ultra", "basic", "facebook-only"],
-                "costo": "Gratuito",
-                "uso_recomendado": "Pre-filtrado de bases de datos grandes"
+                "url": "POST /api/v1/without-apis",
+                "input": "dominio o URL de Facebook",
+                "descripcion": "Análisis completo GRATIS (85-95% precisión)",
+                "incluye": "Transparencia Facebook automática",
+                "costo": "Gratuito"
             },
             "con_apis": {
-                "url": "/api/v1/with-apis/",
-                "descripcion": "Detección con APIs oficiales (99% precisión)",
-                "apis": ["Google Ads API", "Meta Marketing API"],
-                "costo": "Pagado por llamada",
-                "uso_recomendado": "Dominios ya pre-filtrados"
+                "url": "POST /api/v1/with-apis", 
+                "input": "dominio o URL de Facebook",
+                "descripcion": "APIs oficiales + transparencia Facebook",
+                "incluye": "Datos exactos Google & Meta",
+                "costo": "Pagado"
             }
         },
-        "flujo_recomendado": [
-            "1. Filtrar dominios con /without-apis (ahorro 80-90%)",
-            "2. Analizar prioritarios con /with-apis (datos exactos)",
-            "3. Tomar decisiones basadas en datos precisos"
-        ],
-        "nuevas_funcionalidades": [
-            "📘 Transparencia avanzada de Facebook",
-            "🔬 Scraping de 'anuncios en circulación'",
-            "📊 Endpoints unificados y simplificados",
-            "💰 Calculadora de costos integrada"
+        "input_examples": {
+            "domain": "nike.com",
+            "facebook_url": "https://facebook.com/nike",
+            "json": {"domain": "nike.com", "facebook_url": "https://facebook.com/nike"}
+        },
+        "nueva_funcionalidad": [
+            "📘 Transparencia Facebook automática",
+            "� Input con URL de Facebook directa",
+            "📊 JSON response unificado",
+            "⚡ Solo 2 endpoints simples"
         ]
     }
 
