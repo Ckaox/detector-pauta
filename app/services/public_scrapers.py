@@ -91,17 +91,22 @@ class FacebookAdLibraryScraper:
         # Buscar indicadores de que hay anuncios
         text_content = soup.get_text().lower()
         
-        # Patrones que indican presencia de anuncios
+        # Patrones que indican presencia de anuncios (MÁS PATRONES)
         ad_indicators = [
             'ads from',
-            'advertisement',
+            'advertisement', 
             'sponsored',
             'see all ads',
             'active ads',
             'inactive ads',
             f'{domain}',
+            f'{domain.replace(".com", "")}',     # Sin .com
+            f'{domain.split(".")[0]}',           # Solo primera parte
             'advertiser',
-            'page transparency'
+            'page transparency',
+            'campaign',
+            'promotion',
+            'marketing'
         ]
         
         found_indicators = []
@@ -131,12 +136,13 @@ class FacebookAdLibraryScraper:
             except:
                 pass
         
-        # Determinar si hay anuncios basado en los indicadores encontrados
+        # Determinar si hay anuncios basado en los indicadores encontrados (CRITERIOS RELAJADOS)
         analysis['has_ads'] = (
-            len(found_indicators) >= 2 or 
+            len(found_indicators) >= 1 or          # Reducido: solo 1 indicador necesario
             analysis['advertiser_found'] or 
             analysis['estimated_ads'] > 0 or
-            any(keyword in text_content for keyword in ['active ads', 'see all ads', 'advertisement'])
+            any(keyword in text_content for keyword in ['active ads', 'see all ads', 'advertisement', 'sponsored', 'ads from']) or
+            domain.replace('.com', '') in text_content  # Más flexible con nombres
         )
         
         analysis['indicators'] = found_indicators
@@ -208,23 +214,145 @@ class GoogleTransparencyScraper:
         self.user_agent = ua.random
     
     async def search_advertiser(self, domain: str) -> Dict:
-        """Busca un anunciante en Google Ads Transparency Center"""
+        """
+        NUEVA IMPLEMENTACIÓN: Detección alternativa de Google Ads
+        Ya que Google Transparency Center requiere JS/autenticación,
+        usamos métodos más efectivos
+        """
         try:
-            clean_domain = self.normalize_domain(domain)
+            total_score = 0
+            evidence = []
             
-            # URL de búsqueda en Google Transparency
-            search_url = f"{self.base_url}/advertiser?advertiser={quote(clean_domain)}"
+            # Método 1: Verificar ads.txt
+            ads_txt_score = await self._check_ads_txt(domain)
+            total_score += ads_txt_score.get('score', 0)
+            if ads_txt_score.get('evidence'):
+                evidence.extend(ads_txt_score['evidence'])
             
-            content = await self.fetch_content(search_url)
-            if not content:
-                return self.create_result(domain, False, "No se pudo acceder a Google Ads Transparency Center")
+            # Método 2: Verificar scripts de Google Ads
+            scripts_score = await self._check_google_ads_scripts(domain)
+            total_score += scripts_score.get('score', 0)
+            if scripts_score.get('evidence'):
+                evidence.extend(scripts_score['evidence'])
             
-            analysis = self.analyze_search_results(content, clean_domain)
+            # Método 3: Verificar dominios de DoubleClick
+            doubleclick_score = await self._check_doubleclick_domains(domain)
+            total_score += doubleclick_score.get('score', 0)
+            if doubleclick_score.get('evidence'):
+                evidence.extend(doubleclick_score['evidence'])
             
-            return self.create_result(domain, analysis['has_ads'], analysis)
+            # Determinar si tiene Google Ads (threshold más realista)
+            has_ads = total_score >= 20  # Reducido de 30 para ser más sensible
+            confidence = min(100, total_score)
+            
+            analysis = {
+                'has_ads': has_ads,
+                'advertiser_found': has_ads,
+                'indicators': evidence,
+                'total_score': total_score
+            }
+            
+            return self.create_result(domain, has_ads, analysis)
             
         except Exception as e:
-            return self.create_result(domain, False, f"Error en scraping: {str(e)}")
+            return self.create_result(domain, False, f"Error en detección alternativa: {str(e)}")
+
+    async def _check_ads_txt(self, domain: str) -> dict:
+        """Verifica archivo ads.txt para entradas de Google"""
+        try:
+            url = f"https://{domain}/ads.txt"
+            content = await self.fetch_content(url)
+            
+            if content:
+                google_patterns = [
+                    r'google\.com',
+                    r'googlesyndication\.com', 
+                    r'doubleclick\.net',
+                    r'googleadservices\.com'
+                ]
+                
+                google_entries = []
+                for pattern in google_patterns:
+                    matches = re.findall(f".*{pattern}.*", content, re.IGNORECASE)
+                    google_entries.extend(matches[:2])  # Max 2 per pattern
+                
+                if google_entries:
+                    return {
+                        'score': 40,  # High score for ads.txt
+                        'evidence': [f"ads.txt: {entry[:60]}..." for entry in google_entries]
+                    }
+            
+            return {'score': 0}
+            
+        except Exception:
+            return {'score': 0}
+
+    async def _check_google_ads_scripts(self, domain: str) -> dict:
+        """Busca scripts de Google Ads en la página principal"""
+        try:
+            url = f"https://{domain}"
+            content = await self.fetch_content(url)
+            
+            if content:
+                google_ads_patterns = [
+                    r'googleadservices\.com',
+                    r'googlesyndication\.com',
+                    r'doubleclick\.net',
+                    r'google_ad_client',
+                    r'gtag\s*\(\s*[\'"]config[\'"].*[\'"]AW-',
+                    r'_gac_',
+                    r'_gcl_'
+                ]
+                
+                found_patterns = []
+                for pattern in google_ads_patterns:
+                    if re.search(pattern, content, re.IGNORECASE):
+                        found_patterns.append(pattern)
+                
+                if found_patterns:
+                    score = min(30, len(found_patterns) * 6)  # Max 30 points
+                    return {
+                        'score': score,
+                        'evidence': [f"Script: {p[:30]}..." for p in found_patterns]
+                    }
+            
+            return {'score': 0}
+            
+        except Exception:
+            return {'score': 0}
+
+    async def _check_doubleclick_domains(self, domain: str) -> dict:
+        """Verifica conexiones a dominios de Google/DoubleClick"""
+        try:
+            url = f"https://{domain}"
+            content = await self.fetch_content(url)
+            
+            if content:
+                doubleclick_domains = [
+                    'googletagmanager.com',
+                    'googletagservices.com',
+                    'google-analytics.com',
+                    'googleadservices.com',
+                    'googlesyndication.com',
+                    'doubleclick.net'
+                ]
+                
+                found_domains = []
+                for domain_check in doubleclick_domains:
+                    if domain_check in content:
+                        found_domains.append(domain_check)
+                
+                if found_domains:
+                    score = min(25, len(found_domains) * 5)
+                    return {
+                        'score': score,
+                        'evidence': [f"Connected: {d}" for d in found_domains]
+                    }
+            
+            return {'score': 0}
+            
+        except Exception:
+            return {'score': 0}
     
     def normalize_domain(self, domain: str) -> str:
         """Normaliza el dominio"""
@@ -269,14 +397,19 @@ class GoogleTransparencyScraper:
         
         text_content = soup.get_text().lower()
         
-        # Indicadores de Google Ads
+        # Indicadores de Google Ads (MÁS INDICADORES)
         indicators = [
             'advertiser',
             'campaign',
             'google ads',
             'advertisement',
             domain.lower(),
-            'verified advertiser'
+            domain.replace('.com', '').lower(),    # Sin .com
+            domain.split('.')[0].lower(),          # Solo primera parte  
+            'verified advertiser',
+            'ads by',
+            'sponsored',
+            'promotion'
         ]
         
         found_indicators = []
@@ -288,11 +421,12 @@ class GoogleTransparencyScraper:
         if domain.lower() in text_content:
             analysis['advertiser_found'] = True
         
-        # Determinar si hay anuncios
+        # Determinar si hay anuncios (CRITERIOS RELAJADOS)
         analysis['has_ads'] = (
-            len(found_indicators) >= 2 or 
+            len(found_indicators) >= 1 or         # Solo 1 indicador necesario
             analysis['advertiser_found'] or
-            'verified advertiser' in text_content
+            'verified advertiser' in text_content or
+            domain.replace('.com', '').lower() in text_content
         )
         
         analysis['indicators'] = found_indicators
@@ -316,9 +450,10 @@ class GoogleTransparencyScraper:
             return {
                 'domain': domain,
                 'has_ads': has_ads,
-                'source': 'Google Ads Transparency',
+                'source': 'Google Ads Detection (Alternative)',
                 'advertiser_found': details.get('advertiser_found', False),
                 'indicators_found': details.get('indicators', []),
+                'total_score': details.get('total_score', 0),
                 'confidence': confidence,
-                'message': "✅ Anunciante encontrado en Google Transparency" if has_ads else "❌ No encontrado en Google Transparency"
+                'message': f"✅ Google Ads detectados (Score: {details.get('total_score', 0)}%)" if has_ads else f"❌ No detectados (Score: {details.get('total_score', 0)}%)"
             }
