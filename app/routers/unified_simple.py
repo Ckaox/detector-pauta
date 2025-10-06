@@ -156,6 +156,7 @@ async def analyze_without_apis(
             # Analizar componentes individuales
             ultra_analysis = ultra_result.get('ultra_analysis', {})
             basic_detection = ultra_analysis.get('basic_detection', {})
+            advanced_detection = ultra_analysis.get('advanced_detection', {})
             
             if basic_detection:
                 detailed = basic_detection.get('detailed_analysis', {})
@@ -171,6 +172,22 @@ async def analyze_without_apis(
                 # Google Transparency
                 google_trans = detailed.get('google_transparency', {})
                 result["public_libraries"]["google_transparency"] = google_trans.get('has_ads', False)
+            
+            # NUEVO: Mapear datos del análisis avanzado
+            if advanced_detection and 'advanced_analysis' in advanced_detection:
+                adv_analysis = advanced_detection['advanced_analysis']
+                
+                # Landing Pages
+                landing_analysis = adv_analysis.get('landing_pages_analysis', {})
+                result["website_analysis"]["landing_pages_found"] = landing_analysis.get('landing_pages_found', 0) > 0
+                
+                # JavaScript Events  
+                js_analysis = adv_analysis.get('javascript_analysis', {})
+                result["website_analysis"]["javascript_events"] = js_analysis.get('confidence_score', 0) > 30
+                
+                # Third Party Ads
+                third_party_analysis = adv_analysis.get('third_party_analysis', {})
+                result["website_analysis"]["third_party_ads"] = third_party_analysis.get('confidence_score', 0) > 30
         
         # Boost si Facebook transparency detectó algo
         if result["facebook_transparency"]["ads_in_circulation"]:
@@ -187,6 +204,12 @@ async def analyze_without_apis(
             result["detection_summary"]["sources_detected"].append("facebook_ad_library")
         if result["public_libraries"]["google_transparency"]:
             result["detection_summary"]["sources_detected"].append("google_transparency")
+        if result["website_analysis"]["landing_pages_found"]:
+            result["detection_summary"]["sources_detected"].append("landing_pages")
+        if result["website_analysis"]["javascript_events"]:
+            result["detection_summary"]["sources_detected"].append("javascript_events")
+        if result["website_analysis"]["third_party_ads"]:
+            result["detection_summary"]["sources_detected"].append("third_party_ads")
         
         # Incluir detalles completos solo si se solicita
         if include_details:
