@@ -142,12 +142,66 @@ async def analyze_without_apis(
         # Procesar resultados del análisis ultra
         if ultra_result and not isinstance(ultra_result, Exception):
             final_assessment = ultra_result.get('final_assessment', {})
+            ultra_score = final_assessment.get('ultra_score', 0.0)
+            
+            # Analizar componentes individuales PRIMERO
+            ultra_analysis = ultra_result.get('ultra_analysis', {})
+            basic_detection = ultra_analysis.get('basic_detection', {})
+            
+            # Extraer detecciones individuales
+            facebook_ads = False
+            google_ads = False
+            tracking_detected = False
+            
+            if basic_detection:
+                detailed = basic_detection.get('detailed_analysis', {})
+                
+                # Facebook Ad Library
+                fb_library = detailed.get('facebook_ad_library', {})
+                facebook_ads = fb_library.get('has_ads', False)
+                
+                # Google Transparency
+                google_transp = detailed.get('google_transparency', {})
+                google_ads = google_transp.get('has_ads', False)
+                
+                # Website tracking
+                website_tracking = detailed.get('website_tracking', {})
+                tracking_score = website_tracking.get('probability_score', 0)
+                tracking_detected = tracking_score > 20
+            
+            # LÓGICA INTELIGENTE: Has ads si CUALQUIERA de estas condiciones:
+            # 1. Facebook Ad Library detectó ads (FUERTE)
+            # 2. Google Transparency detectó ads (FUERTE)  
+            # 3. Score ultra >= 15% (MODERADO)
+            # 4. Tracking muy fuerte (>60%) (MODERADO)
+            ultra_has_ads = final_assessment.get('likely_has_ads', False)
+            strong_tracking = tracking_score > 60 if basic_detection else False
+            
+            final_has_ads = (
+                facebook_ads or           # Facebook API detectó ads
+                google_ads or            # Google detectó ads  
+                ultra_has_ads or         # Score ultra alto
+                strong_tracking          # Tracking muy fuerte
+            )
+            
+            # Crear lista de fuentes que detectaron ads
+            sources_detected = []
+            if facebook_ads:
+                sources_detected.append('facebook_ad_library')
+            if google_ads:
+                sources_detected.append('google_transparency')
+            if tracking_detected:
+                sources_detected.append('website_tracking')
+            if ultra_has_ads:
+                sources_detected.append('ultra_analysis')
             
             result["detection_summary"].update({
-                "has_ads_detected": final_assessment.get('likely_has_ads', False),
+                "has_ads_detected": final_has_ads,  # ¡Usar lógica combinada inteligente!
                 "confidence_level": final_assessment.get('confidence_level', 'low'),
-                "overall_score": final_assessment.get('ultra_score', 0.0),
-                "priority": final_assessment.get('priority', 'LOW')
+                "overall_score": ultra_score,
+                "priority": final_assessment.get('priority', 'LOW'),
+                "sources_detected": sources_detected,
+                "combination_logic": "smart_OR"  # Indicar que usamos lógica OR inteligente
             })
             
             result["recommendation"] = ultra_result.get('recommendation', '')
@@ -163,7 +217,7 @@ async def analyze_without_apis(
                 
                 # Website tracking
                 website_tracking = detailed.get('website_tracking', {})
-                result["website_analysis"]["tracking_detected"] = website_tracking.get('probability_score', 0) > 30
+                result["website_analysis"]["tracking_detected"] = website_tracking.get('probability_score', 0) > 20  # Reducido de 30
                 
                 # Facebook Ad Library
                 fb_library = detailed.get('facebook_ad_library', {})

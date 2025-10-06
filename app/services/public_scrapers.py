@@ -242,7 +242,7 @@ class GoogleTransparencyScraper:
                 evidence.extend(doubleclick_score['evidence'])
             
             # Determinar si tiene Google Ads (threshold más realista)
-            has_ads = total_score >= 20  # Reducido de 30 para ser más sensible
+            has_ads = total_score >= 15  # Reducido de 20 para ser más sensible
             confidence = min(100, total_score)
             
             analysis = {

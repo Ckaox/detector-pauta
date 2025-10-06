@@ -1,7 +1,14 @@
 from typing import Dict, List
 import asyncio
 from .advanced_detector import AdvancedAdsDetector
-from .no_api_detector import NoAPIAdsDetector
+fr                'final_assessment': {
+                    'ultra_score': round(ultra_score, 1),
+                    'basic_score': round(basic_score, 1),
+                    'advanced_score': round(advanced_score, 1),
+                    'confidence_level': confidence,
+                    'priority': priority,
+                    'likely_has_ads': ultra_score >= 15  # Reducido de 25 para capturar más páginas
+                },pi_detector import NoAPIAdsDetector
 
 class UltraAdvancedDetector:
     """
@@ -105,7 +112,7 @@ class UltraAdvancedDetector:
                     'advanced_score': round(advanced_score, 1),
                     'confidence_level': confidence,
                     'priority': priority,
-                    'likely_has_ads': ultra_score >= 40
+                    'likely_has_ads': ultra_score >= 15  # Reducido de 25 para menos falsos negativos
                 },
                 'recommendation': recommendation,
                 'evidence_summary': evidence,
